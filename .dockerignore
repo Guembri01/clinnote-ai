@@ -1,0 +1,72 @@
+# ============================================================================
+# Docker build context exclusions
+# ============================================================================
+
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Python
+**/__pycache__
+**/*.py[cod]
+**/*.pyo
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/htmlcov
+**/.coverage*
+
+# Virtual envs (never ship into the container)
+**/.venv
+**/venv
+**/env
+
+# Node
+**/node_modules
+**/dist
+**/build
+**/.next
+**/dev-dist
+**/.vite
+
+# Environment / secrets (never bake into the image)
+.env
+.env.local
+.env.production
+.env.staging
+**/.env.local
+
+# IDE / OS
+.vscode
+.idea
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local databases / logs / audio
+*.db
+*.sqlite
+*.sqlite3
+*.log
+*.err
+*.wav
+*.mp3
+*.webm
+*.ogg
+
+# Tests / docs (not required at runtime)
+**/tests
+docs
+scripts
+README.md
+CHANGELOG.md
+CONTRIBUTING.md
+CODE_OF_CONDUCT.md
+docker-compose*.yml
+
+# Celery scratch
+celerybeat-schedule
+celerybeat.pid

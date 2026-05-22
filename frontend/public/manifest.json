@@ -1,0 +1,44 @@
+{
+  "name": "ClinNote AI",
+  "short_name": "ClinNote",
+  "description": "Ambient Clinical Voice-to-EHR Note Generator",
+  "theme_color": "#0F1B35",
+  "background_color": "#030712",
+  "display": "standalone",
+  "orientation": "landscape",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "lang": "en",
+  "categories": ["medical", "productivity"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "New Recording Session",
+      "short_name": "New Session",
+      "description": "Start a new clinical recording session",
+      "url": "/sessions/new",
+      "icons": [{ "src": "/icons/mic.svg", "sizes": "96x96" }]
+    },
+    {
+      "name": "View Notes History",
+      "short_name": "History",
+      "description": "View past clinical notes",
+      "url": "/notes",
+      "icons": [{ "src": "/icons/clipboard.svg", "sizes": "96x96" }]
+    }
+  ]
+}

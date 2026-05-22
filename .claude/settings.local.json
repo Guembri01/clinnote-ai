@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f backend/migrations/versions/001_initial_schema.sql)",
+      "Bash(rmdir backend/migrations/versions)",
+      "Bash(rm -rf docs/screenshots/*)"
+    ]
+  }
+}

@@ -1,0 +1,183 @@
+version: "3.9"
+
+# =============================================================================
+# ClinNote AI — Production-flavoured Docker Compose (single source of truth)
+# -----------------------------------------------------------------------------
+# Services:
+#   postgres              : PostgreSQL 16 (PHI store)
+#   redis                 : Redis 7 (Celery broker + result + audio buffer)
+#   backend               : FastAPI on :8003
+#   worker_transcription  : Celery worker — transcription queue
+#   worker_notes          : Celery worker — notes (SOAP) queue
+#   celery_beat           : Celery beat — periodic maintenance tasks
+#   frontend              : React PWA (nginx) on :3000
+#
+# Usage:
+#   cp .env.example .env && edit .env
+#   docker compose up -d
+#   docker compose logs -f backend
+#
+# For local development with hot-reload, also include:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# =============================================================================
+
+networks:
+  clinnote:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+x-env-common: &env-common
+  DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://clinnote:${POSTGRES_PASSWORD:-changeme}@postgres:5432/clinnote_ai}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  SECRET_KEY: ${SECRET_KEY}
+  ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+  ALGORITHM: ${ALGORITHM:-HS256}
+  ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-15}
+  REFRESH_TOKEN_EXPIRE_DAYS: ${REFRESH_TOKEN_EXPIRE_DAYS:-7}
+  OPENAI_API_KEY: ${OPENAI_API_KEY}
+  OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-nano-2025-04-14}
+  DEEPINFRA_API_KEY: ${DEEPINFRA_API_KEY}
+  DEEPINFRA_WHISPER_MODEL: ${DEEPINFRA_WHISPER_MODEL:-openai/whisper-large-v3}
+  AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT: ${AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT}
+  AZURE_DOCUMENT_INTELLIGENCE_KEY: ${AZURE_DOCUMENT_INTELLIGENCE_KEY}
+  SESSION_INACTIVITY_TIMEOUT: ${SESSION_INACTIVITY_TIMEOUT:-900}
+  RECORDING_MAX_DURATION: ${RECORDING_MAX_DURATION:-7200}
+  NOTE_EXPIRY_HOURS: ${NOTE_EXPIRY_HOURS:-24}
+  LOGIN_RATE_LIMIT: ${LOGIN_RATE_LIMIT:-5/minute}
+  MFA_RATE_LIMIT: ${MFA_RATE_LIMIT:-5/minute}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+  ENVIRONMENT: ${ENVIRONMENT:-production}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: clinnote_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clinnote
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: clinnote_ai
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [clinnote]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clinnote -d clinnote_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: clinnote_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks: [clinnote]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: clinnote_backend
+    restart: unless-stopped
+    environment:
+      <<: *env-common
+    ports:
+      - "8003:8003"
+    networks: [clinnote]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8003
+      --loop uvloop
+      --http httptools
+      --log-level info
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  worker_transcription:
+    build: ./backend
+    container_name: clinnote_worker_transcription
+    restart: unless-stopped
+    environment:
+      <<: *env-common
+    networks: [clinnote]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A app.workers.celery_app worker
+      --loglevel=info
+      --queues=transcription
+      --concurrency=2
+      --hostname=worker-transcription@%h
+
+  worker_notes:
+    build: ./backend
+    container_name: clinnote_worker_notes
+    restart: unless-stopped
+    environment:
+      <<: *env-common
+    networks: [clinnote]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      celery -A app.workers.celery_app worker
+      --loglevel=info
+      --queues=notes
+      --concurrency=4
+      --hostname=worker-notes@%h
+
+  celery_beat:
+    build: ./backend
+    container_name: clinnote_celery_beat
+    restart: unless-stopped
+    environment:
+      <<: *env-common
+    networks: [clinnote]
+    depends_on:
+      - redis
+    command: >
+      celery -A app.workers.celery_app beat
+      --loglevel=info
+      --scheduler celery.beat:PersistentScheduler
+
+  frontend:
+    build: ./frontend
+    container_name: clinnote_frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    networks: [clinnote]
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://backend:8003
+      - VITE_API_BASE_URL=http://backend:8003/api/v1
+      - VITE_WS_BASE_URL=ws://backend:8003

@@ -1,0 +1,44 @@
+version: "3.9"
+
+# =============================================================================
+# ClinNote AI — Development override
+# -----------------------------------------------------------------------------
+# Adds hot-reload, source-code bind mounts, and exposed DB/Redis ports.
+# NEVER use this configuration in production.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# =============================================================================
+
+services:
+
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  backend:
+    environment:
+      ENVIRONMENT: development
+    volumes:
+      - ./backend:/app
+    command: >
+      uvicorn app.main:app
+      --host 0.0.0.0
+      --port 8003
+      --reload
+
+  worker_transcription:
+    volumes:
+      - ./backend:/app
+
+  worker_notes:
+    volumes:
+      - ./backend:/app
+
+  celery_beat:
+    volumes:
+      - ./backend:/app
