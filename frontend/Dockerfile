@@ -22,7 +22,7 @@ ENV VITE_WS_BASE_URL=$VITE_WS_BASE_URL
 RUN npm run build
 
 # --- Production Stage ---
-FROM nginx:1.25-alpine AS production
+FROM nginx:1.31-alpine AS production
 
 # Copy nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf
