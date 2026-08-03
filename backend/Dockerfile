@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------
 # Stage 1: Builder — install dependencies
 # ---------------------------------------------------------------------------
-FROM python:3.11-slim AS builder
+FROM python:3.14-slim AS builder
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # ---------------------------------------------------------------------------
 # Stage 2: Runtime — lean production image
 # ---------------------------------------------------------------------------
-FROM python:3.11-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 WORKDIR /app
 
